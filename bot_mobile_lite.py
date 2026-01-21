@@ -211,11 +211,11 @@ class LiteMobileBot:
         """Open long"""
         pos = self.get_position(symbol)
         
-        # Close any short position first
-        if pos['side'] == 'Sell' and pos['size'] > 0:
-            logger.info(f"Closing SHORT position before opening LONG on {symbol}")
+        # Close any existing position first
+        if pos['size'] > 0:
+            logger.info(f"Closing existing {pos['side']} position before opening LONG on {symbol}")
             if not self.close_pos(symbol):
-                logger.error(f"Failed to close short position on {symbol}")
+                logger.error(f"Failed to close existing position on {symbol}")
                 return False
             time.sleep(1)
         
@@ -285,11 +285,11 @@ class LiteMobileBot:
         """Open short"""
         pos = self.get_position(symbol)
         
-        # Close any long position first
-        if pos['side'] == 'Buy' and pos['size'] > 0:
-            logger.info(f"Closing LONG position before opening SHORT on {symbol}")
+        # Close any existing position first
+        if pos['size'] > 0:
+            logger.info(f"Closing existing {pos['side']} position before opening SHORT on {symbol}")
             if not self.close_pos(symbol):
-                logger.error(f"Failed to close long position on {symbol}")
+                logger.error(f"Failed to close existing position on {symbol}")
                 return False
             time.sleep(1)
         
@@ -431,15 +431,9 @@ class LiteMobileBot:
                 if signal != 'none' and signal != self.last_signals[symbol]:
                     self.last_signals[symbol] = signal
                     
-                    # Only allow one position at a time
-                    active = False
-                    for sym in self.pairs:
-                        pos_other = self.get_position(sym)
-                        if pos_other['size'] > 0:
-                            active = True
-                            break
-                    if active:
-                        logger.info(f"❌ Another position is open, cannot trade {symbol} ({signal})")
+                    # Only allow up to 3 positions at a time
+                    if self.has_position_limit():
+                        logger.info(f"❌ 3 active positions already open, cannot trade {symbol} ({signal})")
                     elif signal == 'long':
                         self.open_long(symbol)
                     elif signal == 'short':
