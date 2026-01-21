@@ -209,15 +209,14 @@ class LiteMobileBot:
     
     def open_long(self, symbol):
         """Open long"""
-        pos = self.get_position(symbol)
-        
-        # Close any existing position first
-        if pos['size'] > 0:
-            logger.info(f"Closing existing {pos['side']} position before opening LONG on {symbol}")
-            if not self.close_pos(symbol):
-                logger.error(f"Failed to close existing position on {symbol}")
-                return False
-            time.sleep(1)
+        # Close all short positions across all pairs first
+        for sym in self.pairs:
+            pos = self.get_position(sym)
+            if pos['side'] == 'Sell' and pos['size'] > 0:
+                logger.info(f"Closing SHORT position on {sym} before opening LONG on {symbol}")
+                if not self.close_pos(sym):
+                    logger.error(f"Failed to close short position on {sym}")
+                time.sleep(1)
         
         # Only allow up to 3 positions at a time (across all pairs)
         if self.has_position_limit():
@@ -283,15 +282,14 @@ class LiteMobileBot:
     
     def open_short(self, symbol):
         """Open short"""
-        pos = self.get_position(symbol)
-        
-        # Close any existing position first
-        if pos['size'] > 0:
-            logger.info(f"Closing existing {pos['side']} position before opening SHORT on {symbol}")
-            if not self.close_pos(symbol):
-                logger.error(f"Failed to close existing position on {symbol}")
-                return False
-            time.sleep(1)
+        # Close all long positions across all pairs first
+        for sym in self.pairs:
+            pos = self.get_position(sym)
+            if pos['side'] == 'Buy' and pos['size'] > 0:
+                logger.info(f"Closing LONG position on {sym} before opening SHORT on {symbol}")
+                if not self.close_pos(sym):
+                    logger.error(f"Failed to close long position on {sym}")
+                time.sleep(1)
         
         # Only allow up to 3 positions at a time (across all pairs)
         if self.has_position_limit():
