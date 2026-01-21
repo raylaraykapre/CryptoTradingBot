@@ -196,15 +196,14 @@ class MobileTradingBot:
     
     def open_long(self, symbol: str) -> bool:
         """Open long position"""
-        position = self.get_position(symbol)
-        
-        # Close any short position first
-        if position['side'] == 'Sell' and position['size'] > 0:
-            logger.info(f"Closing SHORT position before opening LONG on {symbol}")
-            if not self.close_position(symbol):
-                logger.error(f"Failed to close short position on {symbol}")
-                return False
-            time.sleep(1)
+        # Close all short positions across all pairs first
+        for sym in self.trading_pairs:
+            pos = self.get_position(sym)
+            if pos['side'] == 'Sell' and pos['size'] > 0:
+                logger.info(f"Closing SHORT position on {sym} before opening LONG on {symbol}")
+                if not self.close_position(sym):
+                    logger.error(f"Failed to close short position on {sym}")
+                time.sleep(1)
         
         # Only allow up to 3 positions at a time (across all pairs)
         if self.has_position_limit():
@@ -267,15 +266,14 @@ class MobileTradingBot:
     
     def open_short(self, symbol: str) -> bool:
         """Open short position"""
-        position = self.get_position(symbol)
-        
-        # Close any long position first
-        if position['side'] == 'Buy' and position['size'] > 0:
-            logger.info(f"Closing LONG position before opening SHORT on {symbol}")
-            if not self.close_position(symbol):
-                logger.error(f"Failed to close long position on {symbol}")
-                return False
-            time.sleep(1)
+        # Close all long positions across all pairs first
+        for sym in self.trading_pairs:
+            pos = self.get_position(sym)
+            if pos['side'] == 'Buy' and pos['size'] > 0:
+                logger.info(f"Closing LONG position on {sym} before opening SHORT on {symbol}")
+                if not self.close_position(sym):
+                    logger.error(f"Failed to close long position on {sym}")
+                time.sleep(1)
         
         # Only allow up to 3 positions at a time (across all pairs)
         if self.has_position_limit():
