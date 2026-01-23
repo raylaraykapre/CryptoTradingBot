@@ -1,6 +1,6 @@
 {
     "api_key": "f5CoXcOfrUeh8BhJXC",
-    "api_secret": "G42bTbSBK9kqZ9phRtvLT5pstU11vkIn2tVk",
+    "api_secret": "G42bTbSBK9kqZ9phRtvLT5pstU11vkIn2tVk", 
     "testnet": false,
     "demo": false,
     "position_mode": "one-way",
@@ -11,16 +11,22 @@
         "XRPUSDT",
         "DOGEUSDT",
         "ZECUSDT",
-        "FARTCOINUSDT"
+        "FARTCOINUSDT",
+        "HYPEUSDT"
     ],
     "leverage": {
         "BTCUSDT": 50,
         "ETHUSDT": 50,
         "SOLUSDT": 50,
-        "XRPUSDT": 35,
-        "DOGEUSDT": 35,
+        "XRPUSDT": 45,
+        "DOGEUSDT": 45,
         "ZECUSDT": 20,
-        "FARTCOINUSDT": 35
+        "FARTCOINUSDT": 45,
+        "HYPEUSDT": 45,
+        "BNBUSDT": 35,
+        "PIPPINUSDT": 15,
+        "XAUTUSDT": 35,
+        "ASTERUSDT": 45
     },
     "position_size_percent": 35,
     "timeframe": "60",
@@ -28,9 +34,9 @@
     "twin_range_fast_range": 1.6,
     "twin_range_slow_period": 55,
     "twin_range_slow_range": 2.0,
-    "stop_loss_percent": 32,
+    "stop_loss_percent": 42,
     "enable_stop_loss": true,
-    "take_profit_percent": 150,
+    "take_profit_percent": 100,
     "enable_take_profit": true,
     "check_interval": 15
 }

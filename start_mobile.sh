@@ -36,7 +36,7 @@ echo "Press Ctrl+C to stop"
 echo ""
 
 # Run the bot
-python bot_mobile.py
+python bot_mobile_lite.py
 
 # Release wakelock on exit
 termux-wake-unlock

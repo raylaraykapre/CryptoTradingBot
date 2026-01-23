@@ -52,27 +52,35 @@ Take Profit:
 
 ### Setup Steps
 
-1. **Edit config.py:**
-```python
-BYBIT_API_KEY = "your_key_here"
-BYBIT_API_SECRET = "your_secret_here"
-USE_TESTNET = True  # Start with testnet!
+1. **Run the bot once to create config:**
+```bash
+python bot_mobile_lite.py
 ```
+This creates `mobile_config.json` automatically.
 
-2. **Adjust if needed:**
-```python
-TRADING_PAIRS = ["BTCUSDT", "ETHUSDT"]  # Your pairs
-POSITION_SIZE_PERCENT = 35               # Keep as is
-STOP_LOSS_PERCENT = 37                   # Keep as is
-TAKE_PROFIT_PERCENT = 150                # Keep as is
-TIMEFRAME = "60"                         # 1 hour
-LEVERAGE = {"BTCUSDT": 37, ...}         # Per pair
+2. **Edit mobile_config.json:**
+```json
+{
+    "api_key": "your_key_here",
+    "api_secret": "your_secret_here",
+    "testnet": true,
+    "trading_pairs": ["BTCUSDT", "ETHUSDT"],
+    "position_size_percent": 35,
+    "stop_loss_percent": 37,
+    "take_profit_percent": 150
+}
 ```
 
 3. **Run the bot:**
 ```bash
-python bot.py
+python bot_mobile_lite.py
 ```
+
+### Web Dashboard (Mobile Friendly)
+```bash
+python web_dashboard.py
+```
+Then access: http://localhost:5000
 
 ## 📋 ROI Formula (For Your Understanding)
 

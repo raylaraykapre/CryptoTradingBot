@@ -1,27 +1,31 @@
-# Supertrend Trading Bot
+# Twin Range Filter Trading Bot
 
-Automated trading bot for Bybit derivatives using the Supertrend strategy.
+Automated trading bot for Bybit derivatives using the Twin Range Filter strategy.
 
 ## Features
 
-- **Supertrend Strategy**: Implements the popular TradingView Supertrend indicator
-- **Multi-symbol trading**: Supports BTCUSDT, ETHUSDT, SOLUSDT (configurable)
+- **Twin Range Filter Strategy**: Implements the popular Twin Range Filter indicator
+- **Multi-symbol trading**: Supports BTCUSDT, ETHUSDT, SOLUSDT, XRPUSDT, DOGEUSDT, ZECUSDT, FARTCOINUSDT (configurable)
 - **Position management**: Automatically closes opposite positions before opening new ones
 - **ROI-based Stop Loss & Take Profit**: Properly calculated based on leverage
 - **Bybit integration**: Connects to Bybit USDT perpetual futures
 - **Testnet support**: Test your strategy safely before going live
+- **Mobile optimized**: Lightweight version for Android devices
+- **Web dashboard**: Control and monitor from any device
 
 ## Strategy Overview
 
-The Supertrend indicator uses ATR (Average True Range) to identify trend direction:
+The Twin Range Filter indicator uses two smoothed range filters to identify trend direction:
 
-- **Long Signal**: When trend direction changes from bearish to bullish (price crosses above Supertrend line)
-- **Short Signal**: When trend direction changes from bullish to bearish (price crosses below Supertrend line)
+- **Long Signal**: When both fast and slow filters show uptrend
+- **Short Signal**: When both fast and slow filters show downtrend
 
 ### Parameters
 
-- **ATR Period**: 10 (default) - Period for calculating Average True Range
-- **Factor**: 3.0 (default) - Multiplier for ATR to set band distance
+- **Fast Period**: 27 (default) - Period for fast range filter
+- **Fast Range**: 1.6 (default) - Multiplier for fast range
+- **Slow Period**: 55 (default) - Period for slow range filter
+- **Slow Range**: 2.0 (default) - Multiplier for slow range
 
 ## Setup
 
@@ -42,62 +46,86 @@ pip install -r requirements.txt
 
 ### 3. Configure the Bot
 
-Edit `config.py` (or it will use defaults):
+Edit `mobile_config.json` (created automatically on first run):
 
-```python
-# Your API credentials
-BYBIT_API_KEY = "your_api_key_here"
-BYBIT_API_SECRET = "your_api_secret_here"
-
-# Set to True for testnet, False for mainnet
-USE_TESTNET = True
-
-# Trading pairs
-TRADING_PAIRS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
-
-# Position size as percentage of wallet balance
-POSITION_SIZE_PERCENT = 35
-
-# Leverage settings
-LEVERAGE = {
-    "BTCUSDT": 10,
-    "ETHUSDT": 10,
-    "SOLUSDT": 10
+```json
+{
+    "api_key": "your_api_key_here",
+    "api_secret": "your_api_secret_here",
+    "testnet": true,
+    "demo": false,
+    "trading_pairs": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+    "leverage": {
+        "BTCUSDT": 35,
+        "ETHUSDT": 35,
+        "SOLUSDT": 35
+    },
+    "position_size_percent": 35,
+    "timeframe": "60",
+    "twin_range_fast_period": 27,
+    "twin_range_fast_range": 1.6,
+    "twin_range_slow_period": 55,
+    "twin_range_slow_range": 2.0,
+    "stop_loss_percent": 37,
+    "enable_stop_loss": true,
+    "take_profit_percent": 150,
+    "enable_take_profit": true,
+    "check_interval": 60
 }
+```
 
-# Supertrend parameters
-ATR_PERIOD = 5
-SUPERTREND_FACTOR = 3.0
-
-# Risk management (ROI-based)
-STOP_LOSS_PERCENT = 42  # 42% ROI loss
-TAKE_PROFIT_PERCENT = 150  # 150% ROI gain
-ENABLE_STOP_LOSS = True
-ENABLE_TAKE_PROFIT = True
-
-# Timeframe (1, 3, 5, 15, 30, 60, 120, 240, etc.)
-TIMEFRAME = "5"
 ```
 
 ### 4. Run the Bot
 
+#### Option 1: Command Line
 ```bash
-python bot.py
+python bot_mobile_lite.py
 ```
+
+#### Option 2: Web Dashboard (Recommended for mobile)
+```bash
+python web_dashboard.py
+```
+Then access from any device:
+- Local: http://localhost:5000
+- Network: http://YOUR_IP:5000
+
+## Mobile Access
+
+### Android Phone Setup
+
+1. **Start the dashboard** on your computer:
+   ```bash
+   py web_dashboard.py
+   ```
+
+2. **Find your computer's IP address**:
+   - Windows: Open Command Prompt → `ipconfig` → Look for "IPv4 Address"
+
+3. **Connect from phone**:
+   - Open browser on phone
+   - Go to: `http://YOUR_IP:5000`
+   - Example: `http://192.168.1.100:5000`
+
+### Features Available on Mobile
+- ✅ Start/Stop bot
+- ✅ Real-time position monitoring
+- ✅ Emergency position closure
+- ✅ Wallet balance display
+- ✅ PnL tracking
 
 ## Strategy Logic
 
-### Supertrend Indicator
+### Twin Range Filter Indicator
 
-The Supertrend indicator combines price action with volatility (ATR) to identify trends:
+The Twin Range Filter combines two smoothed range filters:
 
-1. **Calculate ATR**: Average True Range over specified period (default 10)
-2. **Calculate Bands**: 
-   - Upper Band = (High + Low) / 2 + (Factor × ATR)
-   - Lower Band = (High + Low) / 2 - (Factor × ATR)
-3. **Determine Direction**:
-   - When price crosses above lower band → Bullish (Long signal)
-   - When price crosses below upper band → Bearish (Short signal)
+1. **Fast Filter**: Quick trend detection (27 period, 1.6 range)
+2. **Slow Filter**: Trend confirmation (55 period, 2.0 range)
+3. **Signal Generation**:
+   - LONG when both filters show uptrend
+   - SHORT when both filters show downtrend
 
 ### Position Management
 

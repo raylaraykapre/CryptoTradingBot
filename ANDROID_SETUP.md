@@ -20,8 +20,8 @@ pkg update && pkg upgrade -y
 # Install Python and required tools
 pkg install python git wget -y
 
-# Install Python packages
-pip install requests pandas numpy
+# Install Python packages (lite version needs only requests)
+pip install requests
 
 # Give storage permission (will ask for permission)
 termux-setup-storage
@@ -39,9 +39,9 @@ cd ~/trading-bot
 cp /sdcard/Download/*.py ~/trading-bot/
 
 # Option B: Or manually copy the 3 required files:
-# - bot_mobile.py
-# - bybit_client.py  
-# - twin_range_filter.py
+# - bot_mobile_lite.py
+# - bybit_client_lite.py  
+# - twin_range_filter_lite.py
 ```
 
 ### Step 4: Create Config File
@@ -50,25 +50,30 @@ cp /sdcard/Download/*.py ~/trading-bot/
 # Create config file
 cat > mobile_config.json << 'EOF'
 {
-    "api_key": "f5CoXcOfrUeh8BhJXC",
-    "api_secret": "G42bTbSBK9kqZ9phRtvLT5pstU11vkIn2tVk",
-    "testnet": false,
-    "trading_pairs": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT"],
+    "api_key": "YOUR_API_KEY_HERE",
+    "api_secret": "YOUR_API_SECRET_HERE",
+    "testnet": true,
+    "demo": false,
+    "trading_pairs": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", "ZECUSDT", "FARTCOINUSDT"],
     "leverage": {
-        "BTCUSDT": 100,
-        "ETHUSDT": 100,
-        "SOLUSDT": 100,
-        "XRPUSDT": 50,
-        "DOGEUSDT": 50
+        "BTCUSDT": 35,
+        "ETHUSDT": 35,
+        "SOLUSDT": 35,
+        "XRPUSDT": 35,
+        "DOGEUSDT": 35,
+        "ZECUSDT": 20,
+        "FARTCOINUSDT": 35
     },
     "position_size_percent": 35,
-    "timeframe": "5",
-    "fast_period": 27,
-    "fast_range": 1.6,
-    "slow_period": 55,
-    "slow_range": 2.0,
-    "stop_loss_percent": 50,
+    "timeframe": "60",
+    "twin_range_fast_period": 27,
+    "twin_range_fast_range": 1.6,
+    "twin_range_slow_period": 55,
+    "twin_range_slow_range": 2.0,
+    "stop_loss_percent": 37,
     "enable_stop_loss": true,
+    "take_profit_percent": 150,
+    "enable_take_profit": true,
     "check_interval": 60
 }
 EOF
@@ -86,7 +91,7 @@ In nano editor:
 
 ```bash
 cd ~/trading-bot
-python bot_mobile.py
+python bot_mobile_lite.py
 ```
 
 ## 🔄 Keeping Bot Running
@@ -98,7 +103,7 @@ python bot_mobile.py
 termux-wake-lock
 
 # Run bot
-python bot_mobile.py
+python bot_mobile_lite.py
 
 # When done, release wakelock
 termux-wake-unlock
@@ -114,7 +119,7 @@ pkg install screen -y
 screen -S trading-bot
 
 # Run bot
-python bot_mobile.py
+python bot_mobile_lite.py
 
 # Detach from screen: Press Ctrl+A then D
 # Bot keeps running in background!
@@ -137,20 +142,20 @@ nano ~/.termux/boot/start-trading-bot
 #!/data/data/com.termux/files/usr/bin/bash
 termux-wake-lock
 cd ~/trading-bot
-python bot_mobile.py
+python bot_mobile_lite.py
 ```
 
 ## 📋 Quick Commands
 
 ```bash
 # Start bot
-cd ~/trading-bot && python bot_mobile.py
+cd ~/trading-bot && python bot_mobile_lite.py
 
 # View logs
-tail -f bot_mobile.log
+tail -f bot.log
 
 # Check if running
-ps aux | grep bot_mobile
+ps aux | grep bot_mobile_lite
 
 # Stop bot
 # Press Ctrl+C in Termux
@@ -190,7 +195,7 @@ cat > ~/.shortcuts/Start-Bot.sh << 'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 cd ~/trading-bot
 termux-wake-lock
-python bot_mobile.py
+python bot_mobile_lite.py
 EOF
 
 chmod +x ~/.shortcuts/Start-Bot.sh
@@ -237,7 +242,7 @@ termux-wake-lock
 # Or use screen/tmux
 pkg install screen -y
 screen -S bot
-python bot_mobile.py
+python bot_mobile_lite.py
 # Press Ctrl+A then D to detach
 ```
 
