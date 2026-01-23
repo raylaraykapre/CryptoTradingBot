@@ -144,9 +144,6 @@ class LiteMobileBot:
     
     def setup_leverage(self):
         """Setup leverage"""
-        if self.config.get('demo', False):
-            logger.info("🎭 DEMO MODE: Skipping leverage setup")
-            return
         for symbol in self.pairs:
             lev = self.config['leverage'].get(symbol, 10)
             if self.client.set_leverage(symbol, lev):
