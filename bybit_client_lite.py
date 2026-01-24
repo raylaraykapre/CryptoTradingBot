@@ -44,6 +44,21 @@ class BybitClientLite:
         """Get current timestamp in milliseconds"""
         return int(time.time() * 1000)
     
+    def _get_server_time(self) -> int:
+        """Get server timestamp from Bybit API"""
+        try:
+            url = f"{self.base_url}/v5/market/time"
+            response = requests.get(url, timeout=5, verify=False)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('retCode') == 0:
+                    server_time = int(data['result']['timeSecond']) * 1000
+                    return server_time
+        except Exception as e:
+            logger.warning(f"Failed to get server time: {e}")
+        # Fallback to local time if server time fails
+        return self._get_timestamp()
+    
     def _request_v5(self, method: str, endpoint: str, params: Dict = None, signed: bool = False) -> Dict:
         """Make V5 API request"""
         url = f"{self.base_url}{endpoint}"
@@ -51,7 +66,7 @@ class BybitClientLite:
         headers = {}
         
         if signed:
-            timestamp = str(self._get_timestamp())
+            timestamp = str(self._get_server_time())
             
             if method == 'GET':
                 param_str = '&'.join([f"{k}={v}" for k, v in sorted(params.items())])

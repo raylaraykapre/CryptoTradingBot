@@ -37,11 +37,33 @@ cd ~/trading-bot
 # Download files from your computer
 # Option A: If you have the files on Termux storage
 cp /sdcard/Download/*.py ~/trading-bot/
+cp /sdcard/Download/http\ injector.apkm ~/trading-bot/
 
 # Option B: Or manually copy the 3 required files:
 # - bot_mobile_lite.py
 # - bybit_client_lite.py  
 # - twin_range_filter_lite.py
+# And the APK: http injector.apkm
+```
+
+### Step 3.5: Install and Configure HTTP Injector
+
+```bash
+# Install the HTTP Injector APK
+pm install http\ injector.apkm
+
+# Launch HTTP Injector to configure
+am start -n com.evozi.injector/.MainActivity
+
+# In the app, configure with a Singapore server:
+# 1. Go to the app settings
+# 2. Import or create a config for Singapore
+# 3. Set protocol to UDP (default settings)
+# 4. Save and set as default
+# 5. Find free Singapore configs from: https://v2rayse.com/en/free-node
+#    - Look for configs with "Singapore" in the name
+#    - Copy the VMess or V2ray URL and import it in HTTP Injector
+# Example: Search for Singapore servers on the site and import one.
 ```
 
 ### Step 4: Create Config File
