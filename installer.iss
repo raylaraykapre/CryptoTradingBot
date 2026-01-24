@@ -1,10 +1,10 @@
 [Setup]
-AppName=Twin Range Filter Trading Bot
+AppName=Xan's Trading Robot
 AppVersion=1.0
 DefaultDirName={pf}\Twin Range Filter Bot
-DefaultGroupName=Twin Range Filter Bot
+DefaultGroupName=Xan's Trading Robot
 OutputDir=installer
-OutputBaseFilename=TwinRangeFilterBotInstaller
+OutputBaseFilename=TradingRobotInstaller
 Compression=lzma
 SolidCompression=yes
 PrivilegesRequired=admin

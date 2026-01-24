@@ -15,12 +15,17 @@ from twin_range_filter_lite import calculate_signals
 
 stop_flag = False
 
+# Create user data directory
+user_data_dir = os.path.join(os.environ.get('APPDATA', ''), 'TwinRangeFilterBot')
+os.makedirs(user_data_dir, exist_ok=True)
+
 # Configure logging
+log_file = os.path.join(user_data_dir, 'bot.log')
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(message)s',
     handlers=[
-        logging.FileHandler('bot.log'),
+        logging.FileHandler(log_file),
         logging.StreamHandler()
     ]
 )
@@ -37,6 +42,7 @@ class LiteMobileBot:
     def __init__(self):
         """Initialize bot"""
         self.config = self.load_config()
+        self.state_file = os.path.join(user_data_dir, 'bot_state.json')
         
         self.client = BybitClientLite(
             api_key=self.config['api_key'],
@@ -120,7 +126,7 @@ class LiteMobileBot:
     
     def save_state(self):
         """Save state"""
-        with open('bot_state.json', 'w') as f:
+        with open(self.state_file, 'w') as f:
             json.dump({'signals': self.last_signals, 'time': datetime.now().isoformat()}, f)
     
     def has_any_position(self):
@@ -146,9 +152,9 @@ class LiteMobileBot:
     
     def load_state(self):
         """Load state"""
-        if os.path.exists('bot_state.json'):
+        if os.path.exists(self.state_file):
             try:
-                with open('bot_state.json', 'r') as f:
+                with open(self.state_file, 'r') as f:
                     state = json.load(f)
                     self.last_signals = state.get('signals', self.last_signals)
             except:
