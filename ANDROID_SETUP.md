@@ -46,24 +46,12 @@ cp /sdcard/Download/http\ injector.apkm ~/trading-bot/
 # And the APK: http injector.apkm
 ```
 
-### Step 3.5: Install and Configure HTTP Injector
+### Step 3.5: Setup VPN (Optional for Mobile)
 
-```bash
-# Install the HTTP Injector APK
-pm install http\ injector.apkm
-
-# Launch HTTP Injector to configure
-am start -n com.evozi.injector/.MainActivity
-
-# In the app, configure with a Singapore server:
-# 1. Go to the app settings
-# 2. Import or create a config for Singapore
-# 3. Set protocol to UDP (default settings)
-# 4. Save and set as default
-# 5. Find free Singapore configs from: https://v2rayse.com/en/free-node
-#    - Look for configs with "Singapore" in the name
-#    - Copy the VMess or V2ray URL and import it in HTTP Injector
-# Example: Search for Singapore servers on the site and import one.
+If running on Android and needing VPN for trading restrictions:
+- The bot now integrates V2ray VPN directly.
+- For mobile, you can still use HTTP Injector or similar apps, but it's not required.
+- Configure any VPN app with a Singapore server if needed.
 ```
 
 ### Step 4: Create Config File
