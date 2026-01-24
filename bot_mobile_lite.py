@@ -13,6 +13,8 @@ import sys
 from bybit_client_lite import BybitClientLite
 from twin_range_filter_lite import calculate_signals
 
+stop_flag = False
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -492,7 +494,7 @@ class LiteMobileBot:
         last_status = time.time()
         
         try:
-            while self.running:
+            while self.running and not stop_flag:
                 self.check_stop_loss_take_profit()
                 self.check_signals()
                 

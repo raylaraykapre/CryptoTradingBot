@@ -49,9 +49,8 @@ cp /sdcard/Download/http\ injector.apkm ~/trading-bot/
 ### Step 3.5: Setup VPN (Optional for Mobile)
 
 If running on Android and needing VPN for trading restrictions:
-- The bot now integrates V2ray VPN directly.
-- For mobile, you can still use HTTP Injector or similar apps, but it's not required.
-- Configure any VPN app with a Singapore server if needed.
+- Use Urban VPN or any preferred VPN app configured with a Taiwan server.
+- For mobile, configure the VPN app separately before running the bot.
 ```
 
 ### Step 4: Create Config File
