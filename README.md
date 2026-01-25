@@ -233,6 +233,7 @@ This bot is for educational purposes. Trading cryptocurrencies involves substant
 MIT License - See LICENSE file for details
 
 Copyright (c) 2026 beaver
+
 Portions Copyright (c) colinmck (Original Twin Range Filter Logic)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
