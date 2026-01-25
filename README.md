@@ -232,5 +232,5 @@ This bot is for educational purposes. Trading cryptocurrencies involves substant
 
 MIT License - See LICENSE file for details
 
-Based on the Supertrend indicator concept from TradingView
+Based on the Twin Range Filter indicator concept from TradingView
 A BIG SHOUTOUT TO © colinmck for the outsource of the indicator code on TradinView
