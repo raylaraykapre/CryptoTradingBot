@@ -508,7 +508,13 @@ class LiteMobileBot:
                     self.status()
                     last_status = time.time()
                 
-                time.sleep(self.config['check_interval'])
+                # Sleep in 1-second intervals to allow quick stopping
+                for _ in range(self.config['check_interval']):
+                    if stop_flag:
+                        break
+                    time.sleep(1)
+                if stop_flag:
+                    break
         
         except KeyboardInterrupt:
             logger.info("\n👋 Stopping...")
