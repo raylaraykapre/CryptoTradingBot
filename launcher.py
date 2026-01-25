@@ -60,10 +60,14 @@ def run_bot():
 def stop_bot():
     global bot_process
     if bot_process and bot_process.is_alive():
+        append_log("Stopping bot...")
         bot_mobile_lite.stop_flag = True
         bot_process.join(timeout=5)
+        if bot_process.is_alive():
+            append_log("Bot did not stop gracefully, forcing...")
+        else:
+            append_log("Bot stopped.")
         bot_process = None
-        append_log("Bot stopped.")
 
 def create_config_if_not_exists():
     config_file = 'mobile_config.json'

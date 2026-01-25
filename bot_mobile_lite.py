@@ -501,6 +501,9 @@ class LiteMobileBot:
         
         try:
             while self.running and not stop_flag:
+                if stop_flag:
+                    logger.info("Stop flag detected, stopping bot...")
+                    break
                 self.check_stop_loss_take_profit()
                 self.check_signals()
                 
@@ -511,6 +514,7 @@ class LiteMobileBot:
                 # Sleep in 1-second intervals to allow quick stopping
                 for _ in range(self.config['check_interval']):
                     if stop_flag:
+                        logger.info("Stop flag detected during sleep, stopping bot...")
                         break
                     time.sleep(1)
                 if stop_flag:
