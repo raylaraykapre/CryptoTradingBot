@@ -308,11 +308,11 @@ class BybitClientLite:
         
         if stop_loss:
             params['stopLoss'] = str(round(stop_loss, 4))
-            logger.info(f"  ⛔ SL set: ${stop_loss:.4f}")
+            logger.info(f"  ⛔ SL set: {stop_loss:.4f}")
         
         if take_profit:
             params['takeProfit'] = str(round(take_profit, 4))
-            logger.info(f"  🎯 TP set: ${take_profit:.4f}")
+            logger.info(f"  🎯 TP set: {take_profit:.4f}")
         
         response = self._request_v5('POST', endpoint, params, signed=True)
         
@@ -432,3 +432,39 @@ class BybitClientLite:
             return {}
         
         return response.get('result', {})
+
+    def get_all_instruments(self) -> List[Dict]:
+        """Fetch ALL USDT perpetual derivatives from Bybit.
+        Returns list of dicts: [{symbol, maxLeverage}, ...] sorted by symbol.
+        Handles pagination via cursor."""
+        all_instruments = []
+        cursor = None
+        while True:
+            endpoint = "/v5/market/instruments-info"
+            params = {
+                'category': 'linear',
+                'limit': 1000,
+            }
+            if cursor:
+                params['cursor'] = cursor
+            response = self._request_v5('GET', endpoint, params)
+            if response.get('retCode') != 0:
+                break
+            result = response.get('result', {})
+            items = result.get('list', [])
+            for inst in items:
+                sym = inst.get('symbol', '')
+                status = inst.get('status', '')
+                settle = inst.get('settleCoin', '')
+                if status == 'Trading' and settle == 'USDT' and sym.endswith('USDT'):
+                    max_lev = inst.get('leverageFilter', {}).get('maxLeverage', '10')
+                    all_instruments.append({
+                        'symbol': sym,
+                        'maxLeverage': int(float(max_lev))
+                    })
+            next_cursor = result.get('nextPageCursor', '')
+            if not next_cursor or next_cursor == cursor:
+                break
+            cursor = next_cursor
+        all_instruments.sort(key=lambda x: x['symbol'])
+        return all_instruments

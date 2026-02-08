@@ -56,10 +56,27 @@ BTN_PAIR_BG  = "#7c4dff"
 BTN_DEMO_BG  = "#ff6f00"
 BTN_REAL_BG  = "#00b8d4"
 BTN_LEV_BG   = "#6d4c41"
+BTN_TF_BG    = "#00695c"
 
 # ─── PHP conversion ──────────────────────────────────────────────────────────
 PHP_RATE = 56.5          # fallback USDT → PHP rate
 _php_last_fetch = 0
+
+# ─── Bybit instruments cache ────────────────────────────────────────────────
+_bybit_instruments = []     # [{symbol, maxLeverage}, ...]
+_instruments_fetched = False
+
+# ─── Timeframe map ──────────────────────────────────────────────────────────
+TIMEFRAME_MAP = {
+    '1':   '1 Minute',
+    '5':   '5 Minutes',
+    '15':  '15 Minutes',
+    '30':  '30 Minutes',
+    '60':  '1 Hour',
+    '240': '4 Hours',
+}
+TIMEFRAME_LABELS = list(TIMEFRAME_MAP.values())
+TIMEFRAME_VALUES = list(TIMEFRAME_MAP.keys())
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────────
 
@@ -120,6 +137,46 @@ def _php(usd):
     return f"\u20b1{usd * PHP_RATE:,.2f}"
 
 
+def _fetch_bybit_instruments():
+    """Fetch all USDT perpetual derivatives from Bybit (public, no auth)."""
+    global _bybit_instruments, _instruments_fetched
+    try:
+        all_instruments = []
+        cursor = None
+        while True:
+            url = 'https://api.bybit.com/v5/market/instruments-info'
+            params = {'category': 'linear', 'limit': '1000'}
+            if cursor:
+                params['cursor'] = cursor
+            r = requests.get(url, params=params, timeout=15, verify=False)
+            if r.status_code != 200:
+                break
+            data = r.json()
+            if data.get('retCode') != 0:
+                break
+            result = data.get('result', {})
+            items = result.get('list', [])
+            for inst in items:
+                sym = inst.get('symbol', '')
+                status = inst.get('status', '')
+                settle = inst.get('settleCoin', '')
+                if status == 'Trading' and settle == 'USDT' and sym.endswith('USDT'):
+                    max_lev = inst.get('leverageFilter', {}).get('maxLeverage', '10')
+                    all_instruments.append({
+                        'symbol': sym,
+                        'maxLeverage': int(float(max_lev))
+                    })
+            next_cursor = result.get('nextPageCursor', '')
+            if not next_cursor or next_cursor == cursor:
+                break
+            cursor = next_cursor
+        all_instruments.sort(key=lambda x: x['symbol'])
+        _bybit_instruments = all_instruments
+        _instruments_fetched = True
+    except Exception:
+        _instruments_fetched = False
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Main Application
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -158,6 +215,8 @@ class TradingWobotApp:
 
         # Fetch PHP rate on startup (in background)
         threading.Thread(target=_refresh_php_rate, daemon=True).start()
+        # Fetch all Bybit instruments on startup (in background)
+        threading.Thread(target=_fetch_bybit_instruments, daemon=True).start()
 
         # periodic updates
         self._poll_logs()
@@ -225,6 +284,16 @@ class TradingWobotApp:
                                       activebackground="#4e342e",
                                       command=self._show_leverage_menu, **_bc)
         self.btn_leverage.pack(side=tk.LEFT, padx=(0, 6))
+
+        # Timeframe selector button
+        cfg_tf = load_config()
+        tf_val = cfg_tf.get('timeframe', '60')
+        tf_label = TIMEFRAME_MAP.get(tf_val, '1 Hour')
+        self.btn_timeframe = tk.Button(brow, text=f"🕒  {tf_label}",
+                                       bg=BTN_TF_BG, fg="#fff",
+                                       activebackground="#004d40",
+                                       command=self._show_timeframe_menu, **_bc)
+        self.btn_timeframe.pack(side=tk.LEFT, padx=(0, 6))
 
         # Demo / Real toggle button
         cfg = load_config()
@@ -339,87 +408,204 @@ class TradingWobotApp:
             self._log("Switched to REAL mode")
 
     # ─────────────────────────────────────────────────────────────────────────
-    #  Pair filter – dropdown with checkboxes
+    #  Pair filter – dropdown with checkboxes (auto-fetched from Bybit)
     # ─────────────────────────────────────────────────────────────────────────
     def _show_pair_menu(self):
-        """Open a popup with checkboxes for pair selection."""
+        """Open a popup with checkboxes for ALL Bybit USDT perpetual pairs."""
         cfg = load_config()
-        all_p = cfg.get('trading_pairs', [])
-        if not all_p:
-            return
-        self._all_pairs = list(all_p)
+        current_pairs = set(cfg.get('trading_pairs', []))
+        current_leverage = cfg.get('leverage', {})
 
         popup = tk.Toplevel(self.root)
-        popup.title("Select Pairs")
+        popup.title("Select Trading Pairs")
         popup.configure(bg=BG)
-        popup.resizable(False, False)
+        popup.resizable(False, True)
         popup.transient(self.root)
         popup.grab_set()
 
         # Position near button
         x = self.btn_pair.winfo_rootx()
         y = self.btn_pair.winfo_rooty() + self.btn_pair.winfo_height() + 4
-        popup.geometry(f"+{x}+{y}")
+        popup.geometry(f"480x620+{x}+{y}")
 
-        tk.Label(popup, text="Trading Pairs", font=self.f_head,
-                 bg=BG, fg=ACCENT).pack(padx=12, pady=(10, 4))
+        tk.Label(popup, text="Bybit USDT Perpetual Pairs", font=self.f_head,
+                 bg=BG, fg=ACCENT).pack(padx=12, pady=(10, 2))
 
-        # "All Pairs" checkbox
-        self._pair_vars = {}
-        all_var = tk.BooleanVar(value=(self.pair_filter is None))
+        # Search box
+        search_var = tk.StringVar()
+        search_frame = tk.Frame(popup, bg=BG)
+        search_frame.pack(fill=tk.X, padx=12, pady=(2, 4))
+        tk.Label(search_frame, text="🔍", bg=BG, fg=FG_DIM).pack(side=tk.LEFT)
+        search_entry = tk.Entry(search_frame, textvariable=search_var,
+                                bg=BG_CARD, fg=FG, font=self.f_body,
+                                insertbackground=FG, bd=1, relief=tk.FLAT)
+        search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=4)
 
-        def _toggle_all():
-            val = all_var.get()
-            for v in self._pair_vars.values():
-                v.set(val)
+        # Status label
+        if not _instruments_fetched or not _bybit_instruments:
+            status_txt = "⏳ Fetching pairs from Bybit... (click Pairs again in a moment)"
+        else:
+            status_txt = f"{len(_bybit_instruments)} pairs available"
+        lbl_status = tk.Label(popup, text=status_txt, font=self.f_small,
+                              bg=BG, fg=FG_DIM)
+        lbl_status.pack(padx=12, pady=(0, 4))
 
-        tk.Checkbutton(popup, text="All Pairs", variable=all_var,
-                       command=_toggle_all,
-                       bg=BG, fg=FG, selectcolor=BG_CARD,
-                       activebackground=BG, activeforeground=FG,
-                       font=self.f_body).pack(anchor=tk.W, padx=16, pady=2)
+        # "Select All" / "Deselect All"
+        btn_row = tk.Frame(popup, bg=BG)
+        btn_row.pack(fill=tk.X, padx=12, pady=2)
 
-        sep = tk.Frame(popup, bg=FG_DIM, height=1)
-        sep.pack(fill=tk.X, padx=12, pady=4)
+        # Scrollable frame for checkboxes
+        canvas_frame = tk.Frame(popup, bg=BG)
+        canvas_frame.pack(fill=tk.BOTH, expand=True, padx=12, pady=4)
 
-        # Individual pair checkboxes
-        # Determine currently active pairs
-        bot = _find_bot_instance()
-        active_pairs = set(bot.pairs) if bot else set(all_p)
+        canvas = tk.Canvas(canvas_frame, bg=BG, highlightthickness=0)
+        scrollbar = tk.Scrollbar(canvas_frame, orient=tk.VERTICAL, command=canvas.yview)
+        inner = tk.Frame(canvas, bg=BG)
 
-        for pair in all_p:
-            var = tk.BooleanVar(value=(pair in active_pairs))
-            self._pair_vars[pair] = var
-            tk.Checkbutton(popup, text=pair, variable=var,
-                           bg=BG, fg=FG, selectcolor=BG_CARD,
-                           activebackground=BG, activeforeground=FG,
-                           font=self.f_body).pack(anchor=tk.W, padx=24, pady=1)
+        inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=inner, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Mouse wheel scroll
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        # Build instrument list (from Bybit or fallback to config)
+        if _instruments_fetched and _bybit_instruments:
+            instruments = _bybit_instruments
+        else:
+            # Fallback: use current config pairs
+            instruments = [{'symbol': s, 'maxLeverage': current_leverage.get(s, 10)}
+                           for s in current_pairs]
+
+        pair_vars = {}
+        pair_widgets = {}
+
+        def _build_checkboxes(filter_text=""):
+            for w in inner.winfo_children():
+                w.destroy()
+            ft = filter_text.upper().strip()
+            for inst in instruments:
+                sym = inst['symbol']
+                max_lev = inst['maxLeverage']
+                if ft and ft not in sym:
+                    continue
+                if sym not in pair_vars:
+                    pair_vars[sym] = tk.BooleanVar(value=(sym in current_pairs))
+                cb_frame = tk.Frame(inner, bg=BG)
+                cb_frame.pack(fill=tk.X, padx=4, pady=1)
+                cb = tk.Checkbutton(cb_frame, text=sym, variable=pair_vars[sym],
+                                    bg=BG, fg=FG, selectcolor=BG_CARD,
+                                    activebackground=BG, activeforeground=FG,
+                                    font=self.f_body)
+                cb.pack(side=tk.LEFT)
+                tk.Label(cb_frame, text=f"(max {max_lev}x)", font=self.f_small,
+                         bg=BG, fg=FG_DIM).pack(side=tk.RIGHT, padx=8)
+                pair_widgets[sym] = cb_frame
+
+        _build_checkboxes()
+
+        def _on_search(*args):
+            _build_checkboxes(search_var.get())
+        search_var.trace_add("write", _on_search)
+
+        def _select_all():
+            for sym, var in pair_vars.items():
+                var.set(True)
+        def _deselect_all():
+            for sym, var in pair_vars.items():
+                var.set(False)
+
+        tk.Button(btn_row, text="Select All", bg=BG_CARD, fg=FG,
+                  font=self.f_small, relief=tk.FLAT, bd=0,
+                  command=_select_all, cursor="hand2").pack(side=tk.LEFT, padx=4)
+        tk.Button(btn_row, text="Deselect All", bg=BG_CARD, fg=FG,
+                  font=self.f_small, relief=tk.FLAT, bd=0,
+                  command=_deselect_all, cursor="hand2").pack(side=tk.LEFT, padx=4)
 
         def _apply():
-            selected = [p for p, v in self._pair_vars.items() if v.get()]
+            selected = [s for s, v in pair_vars.items() if v.get()]
             if not selected:
                 messagebox.showwarning("No Pairs", "Select at least one pair.")
                 return
-            # Apply
-            bot = _find_bot_instance()
-            if len(selected) == len(all_p):
+
+            # Build leverage map: keep existing values, add new pairs with max leverage
+            cfg2 = load_config()
+            lev_map = cfg2.get('leverage', {})
+            inst_map = {i['symbol']: i['maxLeverage'] for i in instruments}
+            new_lev = {}
+            for sym in selected:
+                if sym in lev_map:
+                    new_lev[sym] = lev_map[sym]
+                else:
+                    new_lev[sym] = inst_map.get(sym, 10)
+
+            cfg2['trading_pairs'] = selected
+            cfg2['leverage'] = new_lev
+            save_config(cfg2)
+
+            self._all_pairs = list(selected)
+            if len(selected) == len(instruments):
                 self.pair_filter = None
                 self.btn_pair.config(text="⊞  Pairs")
-                self._log("Trading ALL pairs")
-                if bot:
-                    bot.pairs = list(self._all_pairs)
             else:
                 self.pair_filter = selected
                 self.btn_pair.config(text=f"⊞  {len(selected)} Pairs")
-                self._log(f"Trading: {', '.join(selected)}")
-                if bot:
-                    bot.pairs = list(selected)
+            self._log(f"Trading {len(selected)} pairs saved to config")
+
+            # Apply to running bot
+            bot = _find_bot_instance()
+            if bot:
+                bot.pairs = list(selected)
+                bot.config['trading_pairs'] = list(selected)
+                bot.config['leverage'] = dict(new_lev)
+                bot.last_signals = {p: bot.last_signals.get(p, 'none') for p in selected}
+
+            canvas.unbind_all("<MouseWheel>")
             popup.destroy()
 
-        tk.Button(popup, text="Apply", bg=BTN_PAIR_BG, fg="#fff",
+        def _on_popup_close():
+            canvas.unbind_all("<MouseWheel>")
+            popup.destroy()
+        popup.protocol("WM_DELETE_WINDOW", _on_popup_close)
+
+        tk.Button(popup, text="Apply & Save", bg=BTN_PAIR_BG, fg="#fff",
                   font=self.f_head, relief=tk.FLAT, bd=0,
                   padx=20, pady=6, command=_apply,
                   cursor="hand2").pack(pady=(8, 10))
+
+    # ─────────────────────────────────────────────────────────────────────────
+    #  Timeframe selector
+    # ─────────────────────────────────────────────────────────────────────────
+    def _show_timeframe_menu(self):
+        """Dropdown to pick trading timeframe."""
+        menu = tk.Menu(self.root, tearoff=0, bg=BG_CARD, fg=FG,
+                       activebackground=ACCENT, activeforeground="#000",
+                       font=self.f_body)
+        for val, label in TIMEFRAME_MAP.items():
+            menu.add_command(label=label,
+                             command=lambda v=val, l=label: self._set_timeframe(v, l))
+
+        x = self.btn_timeframe.winfo_rootx()
+        y = self.btn_timeframe.winfo_rooty() + self.btn_timeframe.winfo_height()
+        menu.tk_popup(x, y)
+
+    def _set_timeframe(self, value, label):
+        """Apply selected timeframe to config and running bot."""
+        cfg = load_config()
+        cfg['timeframe'] = value
+        save_config(cfg)
+        self.btn_timeframe.config(text=f"🕒  {label}")
+        self._log(f"Timeframe changed to {label}")
+
+        # Apply to running bot
+        bot = _find_bot_instance()
+        if bot:
+            bot.config['timeframe'] = value
 
     # ─────────────────────────────────────────────────────────────────────────
     #  Leverage preset menu

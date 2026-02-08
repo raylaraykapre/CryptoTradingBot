@@ -90,12 +90,11 @@ class LiteMobileBot:
         logger.info("\ud83d\udcf1 Lite Bot Started")
         logger.info(f"Mode: {'DEMO' if self.config.get('demo', False) else 'TEST' if self.config['testnet'] else 'LIVE'}")
         logger.info(f"Pairs: {len(self.pairs)}")
-        # Fetch PHP rate on startup for demo currency display
-        if self.config.get('demo', False):
-            try:
-                _refresh_php_rate()
-            except Exception:
-                pass
+        # Fetch PHP rate on startup for currency display
+        try:
+            _refresh_php_rate()
+        except Exception:
+            pass
     
     def load_config(self):
         """Load or create config"""
@@ -317,6 +316,7 @@ class LiteMobileBot:
                 logger.info(f"\ud83c\udfad DEMO CLOSE {pos['side']} {symbol} | PnL: {_php(pnl)} | Wallet: {_php(self.config['demo_balance'] / _PHP_RATE)}")
                 del self.demo_positions[symbol]
                 self._save_demo_state()
+                return True
             else:
                 logger.info(f"🎭 DEMO: No position to close for {symbol}")
             return True
@@ -384,14 +384,13 @@ class LiteMobileBot:
             take_profit_price = entry_price * (1 + price_move_percent / 100)
         
         _is_demo = self.config.get('demo', False)
-        _amt = _php(usd) if _is_demo else f'${usd:.2f}'
-        logger.info(f"🟢 LONG {symbol} {_amt} @ ${entry_price:.2f} | {lev}x")
+        logger.info(f"🟢 LONG {symbol} {_php(usd)} @ {_php(entry_price)} | {lev}x")
         if stop_loss_price:
             actual_price_move = ((entry_price - stop_loss_price) / entry_price) * 100
-            logger.info(f"   ⛔ SL: ${stop_loss_price:.2f} ({actual_price_move:.2f}% price = {sl_percent}% ROI)")
+            logger.info(f"   ⛔ SL: {_php(stop_loss_price)} ({actual_price_move:.2f}% price = {sl_percent}% ROI)")
         if take_profit_price:
             actual_price_move = ((take_profit_price - entry_price) / entry_price) * 100
-            logger.info(f"   🎯 TP: ${take_profit_price:.2f} ({actual_price_move:.2f}% price = {tp_percent}% ROI)")
+            logger.info(f"   🎯 TP: {_php(take_profit_price)} ({actual_price_move:.2f}% price = {tp_percent}% ROI)")
         
         if _is_demo:
             self.demo_positions[symbol] = {
@@ -405,7 +404,7 @@ class LiteMobileBot:
                 'time': datetime.now().isoformat()
             }
             self._save_demo_state()
-            logger.info(f"🎭 DEMO OPENED LONG {symbol} {_php(usd)} @ ${entry_price:.2f} | {lev}x")
+            logger.info(f"🎭 DEMO OPENED LONG {symbol} {_php(usd)} @ {_php(entry_price)} | {lev}x")
             return True
         
         resp = self.client.place_order(symbol, 'Buy', qty, stop_loss=stop_loss_price, take_profit=take_profit_price)
@@ -473,14 +472,13 @@ class LiteMobileBot:
             take_profit_price = entry_price * (1 - price_move_percent / 100)
         
         _is_demo = self.config.get('demo', False)
-        _amt = _php(usd) if _is_demo else f'${usd:.2f}'
-        logger.info(f"🔴 SHORT {symbol} {_amt} @ ${entry_price:.2f} | {lev}x")
+        logger.info(f"🔴 SHORT {symbol} {_php(usd)} @ {_php(entry_price)} | {lev}x")
         if stop_loss_price:
             actual_price_move = ((stop_loss_price - entry_price) / entry_price) * 100
-            logger.info(f"   ⛔ SL: ${stop_loss_price:.2f} ({actual_price_move:.2f}% price = {sl_percent}% ROI)")
+            logger.info(f"   ⛔ SL: {_php(stop_loss_price)} ({actual_price_move:.2f}% price = {sl_percent}% ROI)")
         if take_profit_price:
             actual_price_move = ((entry_price - take_profit_price) / entry_price) * 100
-            logger.info(f"   🎯 TP: ${take_profit_price:.2f} ({actual_price_move:.2f}% price = {tp_percent}% ROI)")
+            logger.info(f"   🎯 TP: {_php(take_profit_price)} ({actual_price_move:.2f}% price = {tp_percent}% ROI)")
         
         if _is_demo:
             self.demo_positions[symbol] = {
@@ -494,7 +492,7 @@ class LiteMobileBot:
                 'time': datetime.now().isoformat()
             }
             self._save_demo_state()
-            logger.info(f"🎭 DEMO OPENED SHORT {symbol} {_php(usd)} @ ${entry_price:.2f} | {lev}x")
+            logger.info(f"🎭 DEMO OPENED SHORT {symbol} {_php(usd)} @ {_php(entry_price)} | {lev}x")
             return True
         
         resp = self.client.place_order(symbol, 'Sell', qty, stop_loss=stop_loss_price, take_profit=take_profit_price)
@@ -598,11 +596,7 @@ class LiteMobileBot:
         """Print status"""
         logger.info("=" * 40)
         self.update_wallet()
-        _is_demo = self.config.get('demo', False)
-        if _is_demo:
-            logger.info(f"💰 {_php(self.wallet)}")
-        else:
-            logger.info(f"💰 ${self.wallet:.2f}")
+        logger.info(f"💰 {_php(self.wallet)}")
         
         total_pnl = 0
         active = 0
@@ -613,19 +607,13 @@ class LiteMobileBot:
             price = float(ticker.get('lastPrice', 0)) if ticker else 0
             
             if pos['size'] > 0:
-                if _is_demo:
-                    logger.info(f"{symbol}: {pos['side']} {_php(pos['pnl'])} @ {price:.4f}")
-                else:
-                    logger.info(f"{symbol}: {pos['side']} ${pos['pnl']:.2f} @ {price:.4f}")
+                logger.info(f"{symbol}: {pos['side']} {_php(pos['pnl'])} @ {price:.4f}")
                 total_pnl += pos['pnl']
                 active += 1
             else:
                 logger.info(f"{symbol}: - @ {price:.4f}")
         
-        if _is_demo:
-            logger.info(f"Active: {active} | PnL: {_php(total_pnl)}")
-        else:
-            logger.info(f"Active: {active} | PnL: ${total_pnl:.2f}")
+        logger.info(f"Active: {active} | PnL: {_php(total_pnl)}")
         logger.info("=" * 40)
     
     def run(self):
@@ -697,7 +685,7 @@ def main():
     for i in range(3):
         ticker = bot.client.get_ticker('BTCUSDT')
         if ticker and ticker.get('lastPrice'):
-            logger.info(f"✅ Market data OK - BTC: ${ticker.get('lastPrice')}")
+            logger.info(f"✅ Market data OK - BTC: {_php(float(ticker.get('lastPrice', 0)))}")
             break
         logger.warning(f"Retry {i+1}/3...")
         time.sleep(2)
@@ -715,7 +703,8 @@ def main():
         # Show balance
         for coin in balance.get('list', [{}])[0].get('coin', []):
             if coin.get('coin') == 'USDT':
-                logger.info(f"💰 USDT Balance: {coin.get('walletBalance', 'N/A')}")
+                bal_val = float(coin.get('walletBalance', 0))
+                logger.info(f"💰 Balance: {_php(bal_val)}")
         
         logger.info("=" * 50)
         bot.run()
