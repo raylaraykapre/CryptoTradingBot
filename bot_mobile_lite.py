@@ -13,7 +13,34 @@ import sys
 from bybit_client_lite import BybitClientLite
 from twin_range_filter_lite import calculate_signals
 
+try:
+    import requests as _requests
+except ImportError:
+    _requests = None
+
 stop_flag = False
+
+# ─── PHP conversion for demo mode ───────────────────────────────────────────
+_PHP_RATE = 56.5       # fallback USD → PHP
+_php_last_fetch = 0
+
+def _refresh_php_rate():
+    global _PHP_RATE, _php_last_fetch
+    if _requests is None:
+        return
+    try:
+        r = _requests.get('https://open.er-api.com/v6/latest/USD', timeout=10)
+        if r.status_code == 200:
+            rate = r.json().get('rates', {}).get('PHP')
+            if rate:
+                _PHP_RATE = float(rate)
+    except Exception:
+        pass
+    _php_last_fetch = time.time()
+
+def _php(usd_amount):
+    """Convert USD amount to PHP and return formatted string."""
+    return f"\u20b1{usd_amount * _PHP_RATE:,.2f}"
 
 # Create user data directory
 user_data_dir = os.path.join(os.environ.get('APPDATA', ''), 'TwinRangeFilterBot')
@@ -52,12 +79,23 @@ class LiteMobileBot:
         self.last_signals = {pair: 'none' for pair in self.pairs}
         self.running = False
         self.wallet = 0.0
+        # Demo position tracking
+        self.demo_positions = {}  # {symbol: {side, size, entry, leverage, qty, sl, tp}}
+        self.demo_pnl_total = 0.0  # Accumulated realized PnL in demo
+        self.demo_state_file = os.path.join(user_data_dir, 'demo_state.json')
+        self._load_demo_state()
         # Ensure ZECUSDT leverage is set to 20x
         if 'ZECUSDT' in self.config['leverage']:
             self.config['leverage']['ZECUSDT'] = 20
         logger.info("\ud83d\udcf1 Lite Bot Started")
         logger.info(f"Mode: {'DEMO' if self.config.get('demo', False) else 'TEST' if self.config['testnet'] else 'LIVE'}")
         logger.info(f"Pairs: {len(self.pairs)}")
+        # Fetch PHP rate on startup for demo currency display
+        if self.config.get('demo', False):
+            try:
+                _refresh_php_rate()
+            except Exception:
+                pass
     
     def load_config(self):
         """Load or create config"""
@@ -70,7 +108,7 @@ class LiteMobileBot:
                 "api_secret": "YOUR_API_SECRET",
                 "testnet": True,
                 "demo": False,
-                "demo_balance": 85.0,
+                "demo_balance": 4800.0,
                 "position_mode": "one-way",
                 "trading_pairs": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", "ZECUSDT", "FARTCOINUSDT"],
                 "leverage": {
@@ -141,6 +179,29 @@ class LiteMobileBot:
         max_trades = self.config.get('max_open_trades', 3)
         return self.get_active_positions_count() >= max_trades
     
+    def _load_demo_state(self):
+        """Load demo positions and PnL from disk"""
+        if os.path.exists(self.demo_state_file):
+            try:
+                with open(self.demo_state_file, 'r') as f:
+                    data = json.load(f)
+                    self.demo_positions = data.get('positions', {})
+                    self.demo_pnl_total = data.get('pnl_total', 0.0)
+                    if self.demo_positions:
+                        logger.info(f"🎭 Restored {len(self.demo_positions)} demo position(s)")
+            except Exception:
+                pass
+
+    def _save_demo_state(self):
+        """Persist demo positions and PnL to disk"""
+        try:
+            with open(self.demo_state_file, 'w') as f:
+                json.dump({'positions': self.demo_positions,
+                           'pnl_total': self.demo_pnl_total,
+                           'time': datetime.now().isoformat()}, f, indent=2)
+        except Exception:
+            pass
+
     def load_state(self):
         """Load state"""
         if os.path.exists(self.state_file):
@@ -161,8 +222,19 @@ class LiteMobileBot:
     def update_wallet(self):
         """Update balance"""
         if self.config.get('demo', False):
-            # Simulate wallet balance for demo
-            self.wallet = self.config.get('demo_balance', 85.0)
+            # Demo balance is stored in PHP; convert to USD for internal use
+            base_php = self.config.get('demo_balance', 4800.0)
+            base_usd = base_php / _PHP_RATE if _PHP_RATE else base_php
+            unrealised = 0.0
+            for sym, dp in self.demo_positions.items():
+                ticker = self.client.get_ticker(sym)
+                price = float(ticker.get('lastPrice', 0)) if ticker else 0
+                if price and dp['entry']:
+                    if dp['side'] == 'Buy':
+                        unrealised += (price - dp['entry']) / dp['entry'] * dp['size']
+                    else:
+                        unrealised += (dp['entry'] - price) / dp['entry'] * dp['size']
+            self.wallet = base_usd + unrealised
             return self.wallet
         bal = self.client.get_wallet_balance()
         if bal:
@@ -178,7 +250,29 @@ class LiteMobileBot:
         return self.wallet * (self.config['position_size_percent'] / 100)
     
     def get_position(self, symbol):
-        """Get position"""
+        """Get position (uses simulated data in demo mode)"""
+        if self.config.get('demo', False):
+            dp = self.demo_positions.get(symbol)
+            if dp:
+                # Calculate unrealised PnL from live price
+                ticker = self.client.get_ticker(symbol)
+                price = float(ticker.get('lastPrice', 0)) if ticker else 0
+                if price and dp['entry']:
+                    if dp['side'] == 'Buy':
+                        pnl = (price - dp['entry']) / dp['entry'] * dp['size']
+                    else:
+                        pnl = (dp['entry'] - price) / dp['entry'] * dp['size']
+                else:
+                    pnl = 0
+                return {
+                    'side': dp['side'],
+                    'size': dp['size'],
+                    'entry': dp['entry'],
+                    'pnl': pnl,
+                    'leverage': dp['leverage']
+                }
+            return {'side': 'None', 'size': 0, 'entry': 0, 'pnl': 0, 'leverage': 0}
+
         pos = self.client.get_position(symbol)
         if not pos:
             return {'side': 'None', 'size': 0, 'entry': 0, 'pnl': 0}
@@ -207,8 +301,25 @@ class LiteMobileBot:
         logger.info(f"Closing {pos['side']} {symbol}")
         
         if self.config.get('demo', False):
-            logger.info(f"🎭 DEMO MODE: Would close {pos['side']} position for {symbol}")
-            return True  # Simulate success
+            dp = self.demo_positions.get(symbol)
+            if dp:
+                # Calculate realized PnL
+                ticker = self.client.get_ticker(symbol)
+                price = float(ticker.get('lastPrice', 0)) if ticker else dp['entry']
+                if dp['side'] == 'Buy':
+                    pnl = (price - dp['entry']) / dp['entry'] * dp['size']
+                else:
+                    pnl = (dp['entry'] - price) / dp['entry'] * dp['size']
+                self.demo_pnl_total += pnl
+                # Update demo wallet balance
+                demo_bal = self.config.get('demo_balance', 4800.0)
+                self.config['demo_balance'] = demo_bal + pnl * _PHP_RATE
+                logger.info(f"\ud83c\udfad DEMO CLOSE {pos['side']} {symbol} | PnL: {_php(pnl)} | Wallet: {_php(self.config['demo_balance'] / _PHP_RATE)}")
+                del self.demo_positions[symbol]
+                self._save_demo_state()
+            else:
+                logger.info(f"🎭 DEMO: No position to close for {symbol}")
+            return True
         
         resp = self.client.place_order(symbol, side, pos['size'], reduce_only=True)
         return resp.get('retCode') == 0
@@ -272,7 +383,9 @@ class LiteMobileBot:
             price_move_percent = tp_percent / lev
             take_profit_price = entry_price * (1 + price_move_percent / 100)
         
-        logger.info(f"🟢 LONG {symbol} ${usd:.2f} @ ${entry_price:.2f} | {lev}x")
+        _is_demo = self.config.get('demo', False)
+        _amt = _php(usd) if _is_demo else f'${usd:.2f}'
+        logger.info(f"🟢 LONG {symbol} {_amt} @ ${entry_price:.2f} | {lev}x")
         if stop_loss_price:
             actual_price_move = ((entry_price - stop_loss_price) / entry_price) * 100
             logger.info(f"   ⛔ SL: ${stop_loss_price:.2f} ({actual_price_move:.2f}% price = {sl_percent}% ROI)")
@@ -280,9 +393,20 @@ class LiteMobileBot:
             actual_price_move = ((take_profit_price - entry_price) / entry_price) * 100
             logger.info(f"   🎯 TP: ${take_profit_price:.2f} ({actual_price_move:.2f}% price = {tp_percent}% ROI)")
         
-        if self.config.get('demo', False):
-            logger.info(f"🎭 DEMO MODE: Would place LONG order for {symbol}")
-            return True  # Simulate success
+        if _is_demo:
+            self.demo_positions[symbol] = {
+                'side': 'Buy',
+                'size': usd,
+                'entry': entry_price,
+                'leverage': lev,
+                'qty': qty,
+                'sl': stop_loss_price,
+                'tp': take_profit_price,
+                'time': datetime.now().isoformat()
+            }
+            self._save_demo_state()
+            logger.info(f"🎭 DEMO OPENED LONG {symbol} {_php(usd)} @ ${entry_price:.2f} | {lev}x")
+            return True
         
         resp = self.client.place_order(symbol, 'Buy', qty, stop_loss=stop_loss_price, take_profit=take_profit_price)
         return resp.get('retCode') == 0
@@ -348,7 +472,9 @@ class LiteMobileBot:
             price_move_percent = tp_percent / lev
             take_profit_price = entry_price * (1 - price_move_percent / 100)
         
-        logger.info(f"🔴 SHORT {symbol} ${usd:.2f} @ ${entry_price:.2f} | {lev}x")
+        _is_demo = self.config.get('demo', False)
+        _amt = _php(usd) if _is_demo else f'${usd:.2f}'
+        logger.info(f"🔴 SHORT {symbol} {_amt} @ ${entry_price:.2f} | {lev}x")
         if stop_loss_price:
             actual_price_move = ((stop_loss_price - entry_price) / entry_price) * 100
             logger.info(f"   ⛔ SL: ${stop_loss_price:.2f} ({actual_price_move:.2f}% price = {sl_percent}% ROI)")
@@ -356,9 +482,20 @@ class LiteMobileBot:
             actual_price_move = ((entry_price - take_profit_price) / entry_price) * 100
             logger.info(f"   🎯 TP: ${take_profit_price:.2f} ({actual_price_move:.2f}% price = {tp_percent}% ROI)")
         
-        if self.config.get('demo', False):
-            logger.info(f"🎭 DEMO MODE: Would place SHORT order for {symbol}")
-            return True  # Simulate success
+        if _is_demo:
+            self.demo_positions[symbol] = {
+                'side': 'Sell',
+                'size': usd,
+                'entry': entry_price,
+                'leverage': lev,
+                'qty': qty,
+                'sl': stop_loss_price,
+                'tp': take_profit_price,
+                'time': datetime.now().isoformat()
+            }
+            self._save_demo_state()
+            logger.info(f"🎭 DEMO OPENED SHORT {symbol} {_php(usd)} @ ${entry_price:.2f} | {lev}x")
+            return True
         
         resp = self.client.place_order(symbol, 'Sell', qty, stop_loss=stop_loss_price, take_profit=take_profit_price)
         return resp.get('retCode') == 0
@@ -461,7 +598,11 @@ class LiteMobileBot:
         """Print status"""
         logger.info("=" * 40)
         self.update_wallet()
-        logger.info(f"💰 ${self.wallet:.2f}")
+        _is_demo = self.config.get('demo', False)
+        if _is_demo:
+            logger.info(f"💰 {_php(self.wallet)}")
+        else:
+            logger.info(f"💰 ${self.wallet:.2f}")
         
         total_pnl = 0
         active = 0
@@ -472,13 +613,19 @@ class LiteMobileBot:
             price = float(ticker.get('lastPrice', 0)) if ticker else 0
             
             if pos['size'] > 0:
-                logger.info(f"{symbol}: {pos['side']} ${pos['pnl']:.2f} @ {price:.4f}")
+                if _is_demo:
+                    logger.info(f"{symbol}: {pos['side']} {_php(pos['pnl'])} @ {price:.4f}")
+                else:
+                    logger.info(f"{symbol}: {pos['side']} ${pos['pnl']:.2f} @ {price:.4f}")
                 total_pnl += pos['pnl']
                 active += 1
             else:
                 logger.info(f"{symbol}: - @ {price:.4f}")
         
-        logger.info(f"Active: {active} | PnL: ${total_pnl:.2f}")
+        if _is_demo:
+            logger.info(f"Active: {active} | PnL: {_php(total_pnl)}")
+        else:
+            logger.info(f"Active: {active} | PnL: ${total_pnl:.2f}")
         logger.info("=" * 40)
     
     def run(self):

@@ -3,7 +3,7 @@
     "api_secret": "G42bTbSBK9kqZ9phRtvLT5pstU11vkIn2tVk", 
     "testnet": false,
     "demo": false,
-    "demo_balance": 85.0,
+    "demo_balance": 4800.0,
     "position_mode": "one-way",
     "trading_pairs": [
         "BTCUSDT",

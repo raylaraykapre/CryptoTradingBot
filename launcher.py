@@ -55,6 +55,7 @@ BTN_SET_BG   = "#2979ff"
 BTN_PAIR_BG  = "#7c4dff"
 BTN_DEMO_BG  = "#ff6f00"
 BTN_REAL_BG  = "#00b8d4"
+BTN_LEV_BG   = "#6d4c41"
 
 # ─── PHP conversion ──────────────────────────────────────────────────────────
 PHP_RATE = 56.5          # fallback USDT → PHP rate
@@ -211,12 +212,19 @@ class TradingWobotApp:
                                       command=self._open_settings, **_bc)
         self.btn_settings.pack(side=tk.LEFT, padx=(0, 6))
 
-        # Pair filter button
-        self.btn_pair = tk.Button(brow, text="⊞  All Pairs",
+        # Pair filter button (dropdown with checkboxes)
+        self.btn_pair = tk.Button(brow, text="⊞  Pairs",
                                   bg=BTN_PAIR_BG, fg="#fff",
                                   activebackground="#651fff",
-                                  command=self._toggle_pair_filter, **_bc)
+                                  command=self._show_pair_menu, **_bc)
         self.btn_pair.pack(side=tk.LEFT, padx=(0, 6))
+
+        # Leverage preset button
+        self.btn_leverage = tk.Button(brow, text="⚡ Leverage",
+                                      bg=BTN_LEV_BG, fg="#fff",
+                                      activebackground="#4e342e",
+                                      command=self._show_leverage_menu, **_bc)
+        self.btn_leverage.pack(side=tk.LEFT, padx=(0, 6))
 
         # Demo / Real toggle button
         cfg = load_config()
@@ -331,40 +339,131 @@ class TradingWobotApp:
             self._log("Switched to REAL mode")
 
     # ─────────────────────────────────────────────────────────────────────────
-    #  Pair filter toggle
+    #  Pair filter – dropdown with checkboxes
     # ─────────────────────────────────────────────────────────────────────────
-    def _toggle_pair_filter(self):
-        """Cycle: All Pairs → each individual pair → All Pairs …"""
+    def _show_pair_menu(self):
+        """Open a popup with checkboxes for pair selection."""
         cfg = load_config()
         all_p = cfg.get('trading_pairs', [])
         if not all_p:
             return
-        self._all_pairs = all_p
+        self._all_pairs = list(all_p)
 
-        if self.pair_filter is None:
-            # switch to first pair
-            self.pair_filter = all_p[0]
-        else:
-            idx = all_p.index(self.pair_filter) if self.pair_filter in all_p else -1
-            if idx < len(all_p) - 1:
-                self.pair_filter = all_p[idx + 1]
-            else:
+        popup = tk.Toplevel(self.root)
+        popup.title("Select Pairs")
+        popup.configure(bg=BG)
+        popup.resizable(False, False)
+        popup.transient(self.root)
+        popup.grab_set()
+
+        # Position near button
+        x = self.btn_pair.winfo_rootx()
+        y = self.btn_pair.winfo_rooty() + self.btn_pair.winfo_height() + 4
+        popup.geometry(f"+{x}+{y}")
+
+        tk.Label(popup, text="Trading Pairs", font=self.f_head,
+                 bg=BG, fg=ACCENT).pack(padx=12, pady=(10, 4))
+
+        # "All Pairs" checkbox
+        self._pair_vars = {}
+        all_var = tk.BooleanVar(value=(self.pair_filter is None))
+
+        def _toggle_all():
+            val = all_var.get()
+            for v in self._pair_vars.values():
+                v.set(val)
+
+        tk.Checkbutton(popup, text="All Pairs", variable=all_var,
+                       command=_toggle_all,
+                       bg=BG, fg=FG, selectcolor=BG_CARD,
+                       activebackground=BG, activeforeground=FG,
+                       font=self.f_body).pack(anchor=tk.W, padx=16, pady=2)
+
+        sep = tk.Frame(popup, bg=FG_DIM, height=1)
+        sep.pack(fill=tk.X, padx=12, pady=4)
+
+        # Individual pair checkboxes
+        # Determine currently active pairs
+        bot = _find_bot_instance()
+        active_pairs = set(bot.pairs) if bot else set(all_p)
+
+        for pair in all_p:
+            var = tk.BooleanVar(value=(pair in active_pairs))
+            self._pair_vars[pair] = var
+            tk.Checkbutton(popup, text=pair, variable=var,
+                           bg=BG, fg=FG, selectcolor=BG_CARD,
+                           activebackground=BG, activeforeground=FG,
+                           font=self.f_body).pack(anchor=tk.W, padx=24, pady=1)
+
+        def _apply():
+            selected = [p for p, v in self._pair_vars.items() if v.get()]
+            if not selected:
+                messagebox.showwarning("No Pairs", "Select at least one pair.")
+                return
+            # Apply
+            bot = _find_bot_instance()
+            if len(selected) == len(all_p):
                 self.pair_filter = None
+                self.btn_pair.config(text="⊞  Pairs")
+                self._log("Trading ALL pairs")
+                if bot:
+                    bot.pairs = list(self._all_pairs)
+            else:
+                self.pair_filter = selected
+                self.btn_pair.config(text=f"⊞  {len(selected)} Pairs")
+                self._log(f"Trading: {', '.join(selected)}")
+                if bot:
+                    bot.pairs = list(selected)
+            popup.destroy()
 
-        if self.pair_filter is None:
-            self.btn_pair.config(text="⊞  All Pairs")
-            self._log(f"Switched to ALL trading pairs")
-        else:
-            self.btn_pair.config(text=f"⊞  {self.pair_filter}")
-            self._log(f"Switched to {self.pair_filter} only")
+        tk.Button(popup, text="Apply", bg=BTN_PAIR_BG, fg="#fff",
+                  font=self.f_head, relief=tk.FLAT, bd=0,
+                  padx=20, pady=6, command=_apply,
+                  cursor="hand2").pack(pady=(8, 10))
 
-        # Apply to running bot instance
+    # ─────────────────────────────────────────────────────────────────────────
+    #  Leverage preset menu
+    # ─────────────────────────────────────────────────────────────────────────
+    def _show_leverage_menu(self):
+        """Dropdown to pick leverage preset: Max, 50%, 30%."""
+        menu = tk.Menu(self.root, tearoff=0, bg=BG_CARD, fg=FG,
+                       activebackground=ACCENT, activeforeground="#000",
+                       font=self.f_body)
+        menu.add_command(label="Max Leverage (100%)",
+                         command=lambda: self._apply_leverage_preset(1.0))
+        menu.add_command(label="50% of Max Leverage",
+                         command=lambda: self._apply_leverage_preset(0.5))
+        menu.add_command(label="30% of Max Leverage",
+                         command=lambda: self._apply_leverage_preset(0.3))
+
+        x = self.btn_leverage.winfo_rootx()
+        y = self.btn_leverage.winfo_rooty() + self.btn_leverage.winfo_height()
+        menu.tk_popup(x, y)
+
+    def _apply_leverage_preset(self, fraction):
+        """Set each pair's leverage to fraction * its configured max."""
+        cfg = load_config()
+        lev_map = cfg.get('leverage', {})
+        new_lev = {}
+        for sym, max_lev in lev_map.items():
+            val = max(1, int(max_lev * fraction))
+            new_lev[sym] = val
+        cfg['leverage'] = new_lev
+        save_config(cfg)
+
+        pct = int(fraction * 100)
+        self._log(f"Leverage set to {pct}% of max for all pairs")
+        for sym, lv in new_lev.items():
+            self._log(f"  {sym}: {lv}x")
+
+        # Apply to running bot
         bot = _find_bot_instance()
         if bot:
-            if self.pair_filter is None:
-                bot.pairs = list(self._all_pairs)
-            else:
-                bot.pairs = [self.pair_filter]
+            bot.config['leverage'] = dict(new_lev)
+            # Re-apply leverage on exchange
+            for sym in bot.pairs:
+                lev = new_lev.get(sym, 10)
+                bot.client.set_leverage(sym, lev)
 
     # ─────────────────────────────────────────────────────────────────────────
     #  Bot control
@@ -381,7 +480,7 @@ class TradingWobotApp:
 
         self._all_pairs = cfg.get('trading_pairs', [])
         self.pair_filter = None
-        self.btn_pair.config(text="⊞  All Pairs")
+        self.btn_pair.config(text="⊞  Pairs")
 
         self.running = True
         bot_mobile_lite.stop_flag = False
@@ -427,7 +526,7 @@ class TradingWobotApp:
     def _stop_bot(self):
         if not self.running:
             return
-        self._log("Stopping bot immediately…")
+        self._log("Force stopping bot…")
         # Set global stop flag
         bot_mobile_lite.stop_flag = True
         # Also force the instance's running flag to False
@@ -435,22 +534,21 @@ class TradingWobotApp:
         if bot:
             bot.running = False
         self.lbl_status.config(text="●  STOPPING…", fg=ORANGE)
-        self.btn_stop.config(state=tk.DISABLED)        # Watchdog: if bot hasn't stopped within 5s, force cleanup
-        self.root.after(5000, self._force_stop_check)
+        self.btn_stop.config(state=tk.DISABLED)
+        # Watchdog: force cleanup after 2s no matter what
+        self.root.after(2000, self._force_stop_check)
 
     def _force_stop_check(self):
         """If the bot thread is still alive after timeout, force UI reset."""
         global bot_thread
         if bot_thread and bot_thread.is_alive():
             self._log("Force-stopping bot (thread still alive)…")
-            # Re-set flags to be sure
             bot_mobile_lite.stop_flag = True
             bot = _find_bot_instance()
             if bot:
                 bot.running = False
-            # Give it one more second, then reset UI regardless
-            self.root.after(1000, self._on_bot_stopped)
-        # If thread already finished, _on_bot_stopped was called from _bot_worker
+        # Always reset UI immediately
+        self._on_bot_stopped()
 
     def _open_settings(self):
         p = _config_path()
@@ -607,7 +705,7 @@ def _ensure_config():
             "api_secret": "YOUR_API_SECRET",
             "testnet": True,
             "demo": False,
-            "demo_balance": 85.0,
+            "demo_balance": 4800.0,
             "position_mode": "one-way",
             "trading_pairs": ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT",
                               "DOGEUSDT","ZECUSDT","FARTCOINUSDT"],
