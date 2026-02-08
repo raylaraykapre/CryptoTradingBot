@@ -64,12 +64,15 @@ This creates `mobile_config.json` automatically.
     "api_key": "your_key_here",
     "api_secret": "your_secret_here",
     "testnet": true,
+    "proxy": null,
     "trading_pairs": ["BTCUSDT", "ETHUSDT"],
     "position_size_percent": 35,
     "stop_loss_percent": 37,
     "take_profit_percent": 150
 }
 ```
+
+**Note:** The app uses mobile-like headers to bypass regional restrictions, similar to the Bybit APK. If needed, set `"proxy"` to a proxy server.
 
 3. **Run the bot:**
 ```bash

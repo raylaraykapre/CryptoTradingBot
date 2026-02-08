@@ -54,6 +54,7 @@ Edit `mobile_config.json` (created automatically on first run):
     "api_secret": "your_api_secret_here",
     "testnet": true,
     "demo": false,
+    "proxy": null,
     "trading_pairs": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
     "leverage": {
         "BTCUSDT": 35,
@@ -74,7 +75,7 @@ Edit `mobile_config.json` (created automatically on first run):
 }
 ```
 
-```
+**Note:** If you're in a region where Bybit is restricted, set `"proxy"` to a working proxy server (e.g., `"http://proxy.example.com:8080"`). The app uses mobile-like headers to bypass restrictions similar to the Bybit APK.
 
 ### 4. Run the Bot
 
@@ -165,13 +166,17 @@ Take Profit Price = Entry Price × (1 - (150 / Leverage) / 100)
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `ATR_PERIOD` | 5 | ATR calculation period |
-| `SUPERTREND_FACTOR` | 3.0 | ATR multiplier for bands |
-| `POSITION_SIZE_PERCENT` | 35 | % of wallet balance per trade |
-| `STOP_LOSS_PERCENT` | 42 | ROI % loss to trigger stop loss |
-| `TAKE_PROFIT_PERCENT` | 150 | ROI % gain to trigger take profit |
-| `TIMEFRAME` | "5" | Candle timeframe in minutes |
-| `CHECK_INTERVAL` | 60 | Seconds between signal checks |
+| `api_key` | - | Your Bybit API key |
+| `api_secret` | - | Your Bybit API secret |
+| `testnet` | true | Use testnet (false for live trading) |
+| `proxy` | null | Proxy server for bypassing restrictions (optional) |
+| `trading_pairs` | ["BTCUSDT", "ETHUSDT"] | List of symbols to trade |
+| `position_size_percent` | 35 | % of wallet balance per trade |
+| `leverage` | 35 | Leverage multiplier |
+| `stop_loss_percent` | 42 | ROI % loss to trigger stop loss |
+| `take_profit_percent` | 150 | ROI % gain to trigger take profit |
+| `timeframe` | "60" | Candle timeframe in minutes |
+| `check_interval` | 60 | Seconds between signal checks |
 
 ## Files
 

@@ -25,8 +25,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(message)s',
     handlers=[
-        logging.FileHandler(log_file),
-        logging.StreamHandler()
+        logging.FileHandler(log_file)
     ]
 )
 logger = logging.getLogger(__name__)
@@ -59,16 +58,6 @@ class LiteMobileBot:
         logger.info("\ud83d\udcf1 Lite Bot Started")
         logger.info(f"Mode: {'DEMO' if self.config.get('demo', False) else 'TEST' if self.config['testnet'] else 'LIVE'}")
         logger.info(f"Pairs: {len(self.pairs)}")
-        
-        # Start HTTP Injector VPN app (decompiled from http injector.apkm)
-        try:
-            import subprocess
-            subprocess.run(['am', 'start', '-n', 'com.evozi.injector/.MainActivity'], check=True)
-            logger.info("Started HTTP Injector VPN app in UDP mode connected to Singapore server")
-        except FileNotFoundError:
-            logger.info("am command not found, not on Android - VPN not started")
-        except Exception as e:
-            logger.info(f"Could not start HTTP Injector VPN: {e}")
     
     def load_config(self):
         """Load or create config"""
@@ -81,6 +70,7 @@ class LiteMobileBot:
                 "api_secret": "YOUR_API_SECRET",
                 "testnet": True,
                 "demo": False,
+                "demo_balance": 85.0,
                 "position_mode": "one-way",
                 "trading_pairs": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", "ZECUSDT", "FARTCOINUSDT"],
                 "leverage": {
@@ -147,8 +137,9 @@ class LiteMobileBot:
         return count
     
     def has_position_limit(self):
-        """Return True if the number of active positions is at or above the limit (3)"""
-        return self.get_active_positions_count() >= 3
+        """Return True if the number of active positions is at or above the limit"""
+        max_trades = self.config.get('max_open_trades', 3)
+        return self.get_active_positions_count() >= max_trades
     
     def load_state(self):
         """Load state"""
@@ -171,7 +162,7 @@ class LiteMobileBot:
         """Update balance"""
         if self.config.get('demo', False):
             # Simulate wallet balance for demo
-            self.wallet = 85.0  # Demo balance
+            self.wallet = self.config.get('demo_balance', 85.0)
             return self.wallet
         bal = self.client.get_wallet_balance()
         if bal:
@@ -233,9 +224,10 @@ class LiteMobileBot:
                     logger.error(f"Failed to close short position on {sym}")
                 time.sleep(1)
         
-        # Only allow up to 3 positions at a time (across all pairs)
+        # Only allow up to max_open_trades positions at a time (across all pairs)
         if self.has_position_limit():
-            logger.info(f"❌ 3 active positions already open, cannot open LONG on {symbol}")
+            max_t = self.config.get('max_open_trades', 3)
+            logger.info(f"❌ {max_t} active positions already open, cannot open LONG on {symbol}")
             return False
         
         usd = self.calc_size(symbol)
@@ -306,9 +298,10 @@ class LiteMobileBot:
                     logger.error(f"Failed to close long position on {sym}")
                 time.sleep(1)
         
-        # Only allow up to 3 positions at a time (across all pairs)
+        # Only allow up to max_open_trades positions at a time (across all pairs)
         if self.has_position_limit():
-            logger.info(f"❌ 3 active positions already open, cannot open SHORT on {symbol}")
+            max_t = self.config.get('max_open_trades', 3)
+            logger.info(f"❌ {max_t} active positions already open, cannot open SHORT on {symbol}")
             return False
         
         usd = self.calc_size(symbol)
@@ -376,6 +369,8 @@ class LiteMobileBot:
             return
         
         for symbol in self.pairs:
+            if stop_flag:
+                break
             try:
                 pos = self.get_position(symbol)
                 if pos['size'] == 0:
@@ -416,6 +411,8 @@ class LiteMobileBot:
     def check_signals(self):
         """Check signals"""
         for symbol in self.pairs:
+            if stop_flag:
+                break
             try:
                 # Get klines (already returns list of lists)
                 candles = self.client.get_klines(symbol, self.config['timeframe'], limit=200)
@@ -444,9 +441,10 @@ class LiteMobileBot:
                 if signal != 'none' and signal != self.last_signals[symbol]:
                     self.last_signals[symbol] = signal
                     
-                    # Only allow up to 3 positions at a time
+                    # Only allow up to max_open_trades positions at a time
                     if self.has_position_limit():
-                        logger.info(f"❌ 3 active positions already open, cannot trade {symbol} ({signal})")
+                        max_t = self.config.get('max_open_trades', 3)
+                        logger.info(f"❌ {max_t} active positions already open, cannot trade {symbol} ({signal})")
                     elif signal == 'long':
                         self.open_long(symbol)
                     elif signal == 'short':
@@ -504,7 +502,15 @@ class LiteMobileBot:
                 if stop_flag:
                     logger.info("Stop flag detected, stopping bot...")
                     break
+                # Reload config for live updates
+                try:
+                    with open('mobile_config.json', 'r') as f:
+                        self.config = json.load(f)
+                except Exception:
+                    pass
                 self.check_stop_loss_take_profit()
+                if stop_flag:
+                    break
                 self.check_signals()
                 
                 if time.time() - last_status > 300:

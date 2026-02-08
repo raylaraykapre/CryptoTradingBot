@@ -30,6 +30,21 @@ class BybitClientLite:
         self.api_secret = api_secret
         self.base_url = self.TESTNET_URL if testnet else self.MAINNET_URL
         self.recv_window = 60000  # Increased from 20000 to 60000ms (60 seconds) for better timestamp tolerance
+        self.session = requests.Session()
+        # Add mobile-like headers to bypass restrictions
+        self.session.headers.update({
+            'User-Agent': 'Bybit/2.70.0 (Android 10; SM-G975F; okhttp/4.10.0)',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'X-Requested-With': 'com.bybit.app',
+            'Referer': 'https://www.bybit.com/en/mobile',
+            'Origin': 'https://www.bybit.com',
+            'X-App-Version': '2.70.0',
+            'X-Platform': 'android',
+        })
         
     def _generate_signature(self, params: Dict[str, Any]) -> str:
         """Generate HMAC signature"""
@@ -48,7 +63,7 @@ class BybitClientLite:
         """Get server timestamp from Bybit API"""
         try:
             url = f"{self.base_url}/v5/market/time"
-            response = requests.get(url, timeout=5, verify=False)
+            response = self.session.get(url, timeout=5, verify=False)
             if response.status_code == 200:
                 data = response.json()
                 if data.get('retCode') == 0:
@@ -92,9 +107,9 @@ class BybitClientLite:
         
         try:
             if method == 'GET':
-                response = requests.get(url, params=params, headers=headers, timeout=10, verify=False)
+                response = self.session.get(url, params=params, headers=headers, timeout=10, verify=False)
             else:
-                response = requests.post(url, json=params, headers=headers, timeout=10, verify=False)
+                response = self.session.post(url, json=params, headers=headers, timeout=10, verify=False)
             
             # Check if response is empty
             if not response.text:

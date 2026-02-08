@@ -57,3 +57,12 @@ htmlcov/
 .env
 .env.local
 *.tmp
+
+# Installer output
+installer/
+
+# PyInstaller spec
+*.spec
+
+# Virtual environment
+.venv/

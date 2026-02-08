@@ -1,15 +1,29 @@
 @echo off
-cd /d "%~dp0"
-echo Installing pyinstaller in venv...
-.venv\Scripts\python.exe -m pip install pyinstaller
-echo Running pyinstaller...
-.venv\Scripts\pyinstaller.exe --onedir --windowed -y launcher.py
-echo Copying data files...
-copy mobile_config.json dist\launcher\
-copy bot_mobile_lite.py dist\launcher\
-copy bybit_client_lite.py dist\launcher\
-copy twin_range_filter_lite.py dist\launcher\
-copy bot_state.json dist\launcher\
-copy requirements.txt dist\launcher\
-echo Build complete. Run dist\launcher\launcher.exe
+title Trading Wobot - Build
+echo ========================================
+echo   Trading Wobot - Build
+echo ========================================
+echo.
+
+REM ── Run the PowerShell build script ──
+powershell -ExecutionPolicy Bypass -File "%~dp0build.ps1"
+if errorlevel 1 (
+    echo.
+    echo Build failed. See errors above.
+    pause
+    exit /b 1
+)
+
+echo.
+echo ========================================
+echo   BUILD COMPLETE
+echo   Output: dist\TradingWobot\TradingWobot.exe
+echo ========================================
+echo.
+echo To create the Windows installer:
+echo   1. Install Inno Setup from https://jrsoftware.org/isinfo.php
+echo   2. Open installer.iss with Inno Setup Compiler
+echo   3. Click Build ^> Compile
+echo   4. Installer: installer\TradingWobotSetup.exe
+echo.
 pause

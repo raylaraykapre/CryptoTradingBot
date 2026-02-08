@@ -3,6 +3,7 @@
     "api_secret": "G42bTbSBK9kqZ9phRtvLT5pstU11vkIn2tVk", 
     "testnet": false,
     "demo": false,
+    "demo_balance": 85.0,
     "position_mode": "one-way",
     "trading_pairs": [
         "BTCUSDT",
@@ -14,6 +15,7 @@
         "FARTCOINUSDT",
         "HYPEUSDT"
     ],
+    "max_open_trades": 3,
     "leverage": {
         "BTCUSDT": 50,
         "ETHUSDT": 50,
