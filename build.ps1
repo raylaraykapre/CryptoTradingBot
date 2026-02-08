@@ -1,4 +1,4 @@
-# ───────────────────────────────────────────────────────────────
+﻿# ───────────────────────────────────────────────────────────────
 #  Trading Wobot – Build Script (PowerShell)
 #  Run from the project root:  .\build.ps1
 # ───────────────────────────────────────────────────────────────
@@ -39,13 +39,8 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "[4/6] Preparing icon..."
 $logoPng = "D:\Documents\logo\cute-robot-logo-2c42937a-c1fe-493a-b639-d22a0b5f4671.png"
 if (!(Test-Path "icon.ico") -and (Test-Path $logoPng)) {
-    & $venvPython -c @"
-from PIL import Image
-img = Image.open(r'$logoPng').resize((256,256), Image.LANCZOS)
-img.save('icon.ico', format='ICO',
-         sizes=[(256,256),(128,128),(64,64),(48,48),(32,32),(16,16)])
-print('icon.ico created')
-"@
+    $pyCode = "from PIL import Image; img = Image.open(r'$logoPng').resize((256,256), Image.LANCZOS); img.save('icon.ico', format='ICO', sizes=[(256,256),(128,128),(64,64),(48,48),(32,32),(16,16)]); print('icon.ico created')"
+    & $venvPython -c $pyCode
 } elseif (Test-Path "icon.ico") {
     Write-Host "icon.ico already exists."
 } else {
@@ -55,7 +50,7 @@ print('icon.ico created')
 # ── 5. PyInstaller ──────────────────────────────────────────────
 Write-Host "[5/6] Running PyInstaller..."
 $pyiArgs = @(
-    "-m", "pyinstaller",
+    "-m", "PyInstaller",
     "--onedir",
     "--windowed",
     "--name", "TradingWobot",
